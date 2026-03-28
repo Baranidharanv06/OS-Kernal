@@ -1,4 +1,8 @@
 #include <stdint.h>
+#include <stddef.h>
+
+extern void *kmalloc(size_t size);
+extern void kfree(void *ptr);
 
 volatile char* video = (volatile char*)0xb8000;
 int cursor = 0;
@@ -16,22 +20,42 @@ static const char scancode_to_ascii[] = {
     'z','x','c','v','b','n','m',',','.','/', 0,'*', 0,' '
 };
 
-void print_char(char c, int pos) {
-    video[pos * 2]     = c;
-    video[pos * 2 + 1] = 0x0A;
+void print_str(const char* s) {
+    for (int i = 0; s[i]; i++) {
+        video[cursor*2]   = s[i];
+        video[cursor*2+1] = 0x0A;
+        cursor++;
+    }
+}
+
+void print_hex(uint32_t val) {
+    char buf[11] = "0x00000000";
+    const char* hex = "0123456789ABCDEF";
+    for (int i = 9; i >= 2; i--) {
+        buf[i] = hex[val & 0xF];
+        val >>= 4;
+    }
+    print_str(buf);
 }
 
 void kernel_main() {
-    // Clear screen
     for (int i = 0; i < 80*25*2; i++) video[i] = 0;
 
-    // Print message
-    const char* msg = "Type keys: ";
-    for (int i = 0; msg[i]; i++) {
-        print_char(msg[i], cursor++);
-    }
+    print_str("kmalloc test: ");
 
-    // Poll keyboard directly — no interrupts needed
+    void* a = kmalloc(64);
+    print_hex((uint32_t)a);
+    print_str(" ");
+
+    void* b = kmalloc(128);
+    print_hex((uint32_t)b);
+    print_str(" ");
+
+    void* c = kmalloc(256);
+    print_hex((uint32_t)c);
+
+    print_str(" OK! Type: ");
+
     uint8_t last = 0;
     while (1) {
         uint8_t status = inb(0x64);
@@ -40,7 +64,11 @@ void kernel_main() {
             if (!(scancode & 0x80) && scancode != last) {
                 if (scancode < 58) {
                     char key = scancode_to_ascii[scancode];
-                    if (key) print_char(key, cursor++);
+                    if (key) {
+                        video[cursor*2]   = key;
+                        video[cursor*2+1] = 0x0F;
+                        cursor++;
+                    }
                 }
             }
             last = scancode;
