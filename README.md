@@ -1,24 +1,43 @@
 # MyKernel 🖥️
 
-A bare-metal x86 operating system kernel built from scratch in C and x86 Assembly, running on QEMU. This project implements core OS primitives including a Multiboot-compliant bootloader, VGA text rendering, and PS/2 keyboard input via hardware polling — all without any standard library or operating system support.
+A bare-metal x86 operating system kernel built from scratch in C and x86 Assembly, running on QEMU. Implements core OS primitives — a Multiboot-compliant bootloader, VGA text rendering, PS/2 keyboard input, a bump memory allocator, and an interactive kernel shell — all without any standard library or operating system support.
 
 ---
 
 ## Demo
 
 ```
-Type keys: hello world_
-```
+MyKernel Shell - type 'help' for commands
+mysh> help
 
-The kernel boots,  clears the screen, and responds to every keypress in real time — all running on raw x86 hardware (emulated via QEMU).
+Available commands:
+  help  - show this message
+  clear - clear the screen
+  mem   - show memory info
+  about - about this kernel
+
+mysh> mem
+
+Heap start: 0x00200000
+Heap size:  1MB
+
+mysh> about
+
+MyKernel v1.0 - built from scratch in C + Assembly
+Author: Baranidharanv06
+
+mysh> _
+```
 
 ---
 
 ## Features
 
 - **Multiboot bootloader** — GRUB-compatible entry point, switches CPU to 32-bit protected mode
-- **VGA text rendering** — direct writes to the 0xb8000 memory-mapped text buffer
-- **PS/2 keyboard driver** — hardware polling via I/O ports 0x60 and 0x64 with scancode-to-ASCII translation
+- **VGA text rendering** — direct writes to the 0xb8000 memory-mapped text buffer with color support
+- **PS/2 keyboard driver** — hardware polling via I/O ports 0x60/0x64 with scancode-to-ASCII translation
+- **Bump memory allocator** — `kmalloc`/`kfree` with 8-byte alignment and heap bounds checking
+- **Interactive kernel shell** — command input, parsing, and built-in commands (`help`, `clear`, `mem`, `about`)
 - **Freestanding C kernel** — zero standard library dependencies, compiled with `-ffreestanding -nostdlib`
 - **Cross-compiled on macOS** — full toolchain using `x86_64-elf-gcc` and `x86_64-elf-ld`
 
@@ -30,9 +49,10 @@ The kernel boots,  clears the screen, and responds to every keypress in real tim
 mykernel/
 ├── src/
 │   ├── boot.asm       # Multiboot header + _start entry point
-│   ├── kernel.c       # kernel_main — screen init, keyboard poll loop
-│   ├── keyboard.c     # PS/2 keyboard driver (scancode → ASCII)
-│   ├── idt.c          # Interrupt Descriptor Table setup + PIC remapping
+│   ├── kernel.c       # kernel_main — calls shell_main()
+│   ├── shell.c        # Interactive shell — input, parsing, commands
+│   ├── memory.c       # Bump allocator — kmalloc(), kfree(), reset_heap()
+│   ├── idt.c          # Interrupt Descriptor Table + PIC remapping
 │   ├── isr.asm        # Assembly interrupt service routine stub
 │   └── linker.ld      # Memory layout: kernel loads at 1MB (0x100000)
 ├── build/             # Compiled output (kernel.elf)
@@ -47,21 +67,32 @@ mykernel/
 1. GRUB reads the **Multiboot header** in `boot.asm` (magic number `0x1BADB002`)
 2. CPU is placed into **32-bit protected mode** by GRUB
 3. `_start` sets up the stack pointer and calls `kernel_main()`
-
-### Kernel main
-- Clears the VGA text buffer (80×25 chars at `0xb8000`)
-- Calls `idt_init()` to remap the PIC and load the IDT
-- Enables hardware interrupts with `sti`
-- Enters a polling loop: continuously checks port `0x64` for keyboard input
+4. `kernel_main()` calls `shell_main()` — the kernel becomes an interactive shell
 
 ### Keyboard driver
-- Reads the **status register** at port `0x64` — if bit 0 is set, a scancode is ready
-- Reads the **scancode** from port `0x60`
+- Polls the **status register** at port `0x64` — if bit 0 is set, a scancode is waiting
+- Reads scancode from port `0x60`
 - Translates using a `scancode_to_ascii[]` lookup table
-- Writes the ASCII character to video memory and advances the cursor
+- Handles Enter (execute command), Backspace (delete char), and printable characters
+
+### Shell
+- Reads keypresses into a 256-byte buffer
+- On Enter: null-terminates the buffer and calls `execute()`
+- `execute()` does string comparison against known commands and runs the matching function
+- Loops back to `mysh>` prompt after every command
+
+### Memory allocator (bump allocator)
+- Heap starts at `0x200000` (2MB) — safely above the kernel which loads at 1MB
+- `kmalloc(size)` aligns the current pointer to 8 bytes, checks bounds, bumps forward and returns the address
+- `kfree()` is a no-op — bump allocators don't reclaim individual blocks
+- `reset_heap()` resets the pointer to the start for testing
+
+### VGA text rendering
+- Text mode buffer at `0xb8000` — 80×25 characters, 2 bytes per cell (char + color attribute)
+- Color byte `0x0A` = green on black, `0x0F` = white on black
 
 ### Cross-compilation (macOS)
-macOS ships with a Mach-O toolchain that cannot produce ELF binaries for x86. The project uses:
+macOS ships with a Mach-O toolchain that cannot produce ELF binaries for x86. This project uses:
 - `x86_64-elf-gcc` — produces ELF32 object files
 - `x86_64-elf-ld` — links with a custom linker script to produce a flat ELF kernel
 
@@ -115,19 +146,21 @@ make clean
 - x86 protected mode and memory segmentation
 - VGA text mode and direct memory-mapped I/O
 - PS/2 keyboard protocol — scan codes, status registers, I/O port reads
-- Interrupt Descriptor Tables (IDT) and PIC remapping
+- Implementing `kmalloc`/`kfree` with a bump allocator from scratch
+- Building a command parser and shell loop without any standard library
 - Writing freestanding C — no `malloc`, no `printf`, no OS beneath you
 - Cross-compiling for a different architecture and binary format on macOS
 - GNU `make`, linker scripts, and ELF binary structure
+- Debugging bare-metal code using QEMU
 
 ---
 
 ## Roadmap
 
-- [ ] Memory management — implement `kmalloc` / `kfree` with a simple bump allocator
 - [ ] Interrupt-driven keyboard (replace polling with IDT + IRQ1)
-- [ ] Basic shell — command input, parsing, and built-in commands
 - [ ] Paging — virtual memory with a page table
+- [ ] `echo` command that uses `kmalloc` to store strings dynamically
+- [ ] Process scheduler — basic round-robin multitasking
 - [ ] Filesystem — simple in-memory FAT-style filesystem
 
 ---
