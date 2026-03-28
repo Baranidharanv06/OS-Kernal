@@ -10,7 +10,7 @@ A bare-metal x86 operating system kernel built from scratch in C and x86 Assembl
 Type keys: hello world_
 ```
 
-The kernel boots, clears the screen, and responds to every keypress in real time — all running on raw x86 hardware (emulated via QEMU).
+The kernel boots,  clears the screen, and responds to every keypress in real time — all running on raw x86 hardware (emulated via QEMU).
 
 ---
 
