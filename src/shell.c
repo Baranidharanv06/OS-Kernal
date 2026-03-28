@@ -3,8 +3,8 @@
 
 #define MAX_INPUT 256
 
-extern volatile char* video;
-extern int cursor;
+volatile char* video = (volatile char*)0xb8000;
+int cursor = 0;
 
 static inline uint8_t inb(uint16_t port) {
     uint8_t val;
@@ -71,7 +71,7 @@ void execute(char* buf) {
     else if (str_equal(buf, "about")) cmd_about();
     else if (str_equal(buf, "mem"))   cmd_mem();
     else {
-        print_str("\nUnknown command: ");
+        print_str("\nUnknown: ");
         print_str(buf);
     }
 }
@@ -93,7 +93,7 @@ void shell_main() {
         if (scancode == last) continue;
         last = scancode;
 
-        if (scancode & 0x80) continue; // key release
+        if (scancode & 0x80) continue;
 
         char key = (scancode < 58) ? scancode_to_ascii[scancode] : 0;
         if (!key) continue;
