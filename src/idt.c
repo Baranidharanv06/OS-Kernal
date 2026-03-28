@@ -39,20 +39,28 @@ void idt_init() {
     idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
     idtp.base  = (uint32_t)&idt;
 
+    // Clear IDT
+    for (int i = 0; i < 256; i++)
+        idt_set_gate(i, 0, 0, 0);
+
     // Remap PIC
     outb(PIC1_COMMAND, 0x11);
     outb(PIC2_COMMAND, 0x11);
-    outb(PIC1_DATA, 0x20);
-    outb(PIC2_DATA, 0x28);
-    outb(PIC1_DATA, 0x04);
-    outb(PIC2_DATA, 0x02);
-    outb(PIC1_DATA, 0x01);
-    outb(PIC2_DATA, 0x01);
-    outb(PIC1_DATA, 0x0);
-    outb(PIC2_DATA, 0x0);
+    outb(PIC1_DATA,    0x20);
+    outb(PIC2_DATA,    0x28);
+    outb(PIC1_DATA,    0x04);
+    outb(PIC2_DATA,    0x02);
+    outb(PIC1_DATA,    0x01);
+    outb(PIC2_DATA,    0x01);
+    outb(PIC1_DATA,    0x0);
+    outb(PIC2_DATA,    0x0);
 
-    // Register keyboard at IRQ1 = interrupt 0x21
-    idt_set_gate(0x21, (uint32_t)keyboard_isr, 0x08, 0x8E);
+    // Get current code segment
+    uint16_t cs;
+    __asm__ volatile ("mov %%cs, %0" : "=r"(cs));
+
+    // Register keyboard IRQ1 = 0x21
+    idt_set_gate(0x21, (uint32_t)keyboard_isr, cs, 0x8E);
 
     __asm__ volatile ("lidt %0" :: "m"(idtp));
 }
