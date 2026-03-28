@@ -25,7 +25,7 @@ $(BUILD_DIR)/isr.o: $(SRC_DIR)/isr.asm
 	$(AS) -f elf32 $< -o $@
 
 $(IMAGE): $(BOOT) $(BUILD_DIR)/kernel.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/isr.o
-	$(LD) -m elf_i386 -Ttext 0x1000 --oformat binary $(BUILD_DIR)/kernel.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/isr.o -o $(BUILD_DIR)/kernel.bin
+	$(LD) -m elf_i386 -Ttext 0x7e00 --oformat binary $(BUILD_DIR)/kernel.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/isr.o -o $(BUILD_DIR)/kernel.bin
 	cat $(BOOT) $(BUILD_DIR)/kernel.bin > $@
 
 clean:

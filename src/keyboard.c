@@ -15,25 +15,19 @@ static inline uint8_t inb(uint16_t port) {
     return val;
 }
 
-static inline void outb(uint16_t port, uint8_t val) {
-    __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
-}
-
-// Video memory pointer
 static char* video = (char*)0xb8000;
-static int cursor = 0;
-
-void print_char(char c) {
-    video[cursor * 2] = c;
-    video[cursor * 2 + 1] = 0x07;
-    cursor++;
-}
+static int cursor = 26; // start after welcome message
 
 void keyboard_handler() {
     uint8_t scancode = inb(KEYBOARD_DATA_PORT);
     if (!(scancode & 0x80)) {
-        char key = scancode_to_ascii[scancode];
-        if (key) print_char(key);
+        if (scancode < sizeof(scancode_to_ascii)) {
+            char key = scancode_to_ascii[scancode];
+            if (key) {
+                video[cursor * 2] = key;
+                video[cursor * 2 + 1] = 0x0F; // bright white
+                cursor++;
+            }
+        }
     }
-    outb(0x20, 0x20); // Send EOI to PIC
 }
