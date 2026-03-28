@@ -1,18 +1,15 @@
 # Makefile
 
-# Variables
 BUILD_DIR = ./build
 SRC_DIR = ./src
 AS = nasm
 CC = gcc
-LD = ld
+LD = x86_64-elf-ld
 
-# Target files
 BOOT = $(BUILD_DIR)/boot.bin
 KERNEL = $(BUILD_DIR)/kernel.bin
 IMAGE = $(BUILD_DIR)/os-image.bin
 
-# Rules
 all: $(IMAGE)
 
 $(BOOT): $(SRC_DIR)/boot.asm
