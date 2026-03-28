@@ -14,7 +14,13 @@ $(BUILD_DIR)/boot.o: $(SRC_DIR)/boot.asm
 $(BUILD_DIR)/kernel.o: $(SRC_DIR)/kernel.c
 	$(CC) -m32 -ffreestanding -nostdlib -c $< -o $@
 
-$(IMAGE): $(BUILD_DIR)/boot.o $(BUILD_DIR)/kernel.o
+$(BUILD_DIR)/keyboard.o: $(SRC_DIR)/keyboard.c
+	$(CC) -m32 -ffreestanding -nostdlib -c $< -o $@
+
+$(BUILD_DIR)/memory.o: $(SRC_DIR)/memory.c
+	$(CC) -m32 -ffreestanding -nostdlib -c $< -o $@
+
+$(IMAGE): $(BUILD_DIR)/boot.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/memory.o
 	$(LD) -m elf_i386 -T $(SRC_DIR)/linker.ld -o $@ $^
 
 clean:
