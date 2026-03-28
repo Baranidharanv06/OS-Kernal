@@ -1,4 +1,3 @@
-cat > src/keyboard.c << 'EOF'
 #include <stdint.h>
 
 #define KEYBOARD_DATA_PORT 0x60
@@ -38,4 +37,3 @@ void keyboard_handler() {
     }
     outb(0x20, 0x20); // Send EOI to PIC
 }
-EOF
