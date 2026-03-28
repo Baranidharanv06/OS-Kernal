@@ -1,16 +1,29 @@
-[org 0x7c00]
-[bits 16]
+[bits 32]
 
-    cli
-    xor ax, ax
-    mov ds, ax
-    mov es, ax
-    mov ss, ax
-    mov sp, 0x7c00
-    sti
+; Multiboot header
+MBALIGN  equ 1<<0
+MEMINFO  equ 1<<1
+FLAGS    equ MBALIGN | MEMINFO
+MAGIC    equ 0x1BADB002
+CHECKSUM equ -(MAGIC + FLAGS)
 
-    ; Jump directly to kernel right after bootloader
-    jmp 0x0000:0x7e00
+section .multiboot
+align 4
+    dd MAGIC
+    dd FLAGS
+    dd CHECKSUM
 
-times 510-($-$$) db 0
-dw 0xAA55
+section .text
+global _start
+extern kernel_main
+
+_start:
+    mov esp, stack_top
+    call kernel_main
+    hlt
+
+section .bss
+align 16
+stack_bottom:
+    resb 16384
+stack_top:
