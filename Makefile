@@ -20,7 +20,16 @@ $(BUILD_DIR)/shell.o: $(SRC_DIR)/shell.c
 $(BUILD_DIR)/memory.o: $(SRC_DIR)/memory.c
 	$(CC) -m32 -ffreestanding -nostdlib -c $< -o $@
 
-$(IMAGE): $(BUILD_DIR)/boot.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/shell.o $(BUILD_DIR)/memory.o
+$(BUILD_DIR)/panic.o: $(SRC_DIR)/panic.c
+	$(CC) -m32 -ffreestanding -nostdlib -c $< -o $@
+
+$(BUILD_DIR)/exceptions.o: $(SRC_DIR)/exceptions.c
+	$(CC) -m32 -ffreestanding -nostdlib -c $< -o $@
+
+$(BUILD_DIR)/exceptions_asm.o: $(SRC_DIR)/exceptions.asm
+	$(AS) -f elf32 $< -o $@
+
+$(IMAGE): $(BUILD_DIR)/boot.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/shell.o $(BUILD_DIR)/memory.o $(BUILD_DIR)/panic.o $(BUILD_DIR)/exceptions.o $(BUILD_DIR)/exceptions_asm.o
 	$(LD) -m elf_i386 -T $(SRC_DIR)/linker.ld -o $@ $^
 
 clean:
