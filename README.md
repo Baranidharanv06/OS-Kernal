@@ -209,20 +209,6 @@ make clean
 
 ---
 
-## Roadmap
-
-- [x] Multiboot bootloader
-- [x] VGA text rendering
-- [x] PS/2 keyboard driver (polling)
-- [x] Bump memory allocator (kmalloc/kfree)
-- [x] Interactive kernel shell
-- [x] Kernel panic handler with CPU register dump and per-exception descriptions
-- [ ] Cooperative multitasking — multiple tasks sharing the CPU
-- [ ] Interrupt-driven keyboard (replace polling with IDT + IRQ1)
-- [ ] Paging — virtual memory with a page table
-- [ ] Filesystem — simple in-memory FAT-style filesystem
-
----
 
 ## References
 
