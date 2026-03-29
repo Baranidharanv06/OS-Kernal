@@ -6,6 +6,8 @@
 volatile char* video = (volatile char*)0xb8000;
 int cursor = 0;
 
+extern void kernel_panic(const char* exception, uint32_t code);
+
 static inline uint8_t inb(uint16_t port) {
     uint8_t val;
     __asm__ volatile ("inb %1, %0" : "=a"(val) : "Nd"(port));
@@ -49,15 +51,18 @@ int str_equal(const char* a, const char* b) {
 
 void cmd_help() {
     print_str("\nAvailable commands:\n");
-    print_str("  help  - show this message\n");
-    print_str("  clear - clear the screen\n");
-    print_str("  mem   - show memory info\n");
-    print_str("  about - about this kernel\n");
+    print_str("  help      - show this message\n");
+    print_str("  clear     - clear the screen\n");
+    print_str("  mem       - show memory info\n");
+    print_str("  about     - about this kernel\n");
+    print_str("  panic     - trigger kernel panic (test)\n");
+    print_str("  divzero   - trigger division by zero\n");
 }
 
 void cmd_about() {
-    print_str("\nMyKernel v1.0 - built from scratch in C + Assembly\n");
+    print_str("\nMyKernel v2.0 - built from scratch in C + Assembly\n");
     print_str("Author: Baranidharanv06\n");
+    print_str("Features: Bootloader, VGA, Keyboard, Memory, Shell, Kernel Panic\n");
 }
 
 void cmd_mem() {
@@ -65,11 +70,19 @@ void cmd_mem() {
     print_str("Heap size:  1MB\n");
 }
 
+void cmd_divzero() {
+    int x = 0;
+    int y = 1 / x; // intentional divide by zero
+    (void)y;
+}
+
 void execute(char* buf) {
-    if (str_equal(buf, "help"))       cmd_help();
-    else if (str_equal(buf, "clear")) { clear_screen(); return; }
-    else if (str_equal(buf, "about")) cmd_about();
-    else if (str_equal(buf, "mem"))   cmd_mem();
+    if      (str_equal(buf, "help"))    cmd_help();
+    else if (str_equal(buf, "clear"))   { clear_screen(); return; }
+    else if (str_equal(buf, "about"))   cmd_about();
+    else if (str_equal(buf, "mem"))     cmd_mem();
+    else if (str_equal(buf, "panic"))   kernel_panic("Manual panic trigger", 0xDEADBEEF);
+    else if (str_equal(buf, "divzero")) cmd_divzero();
     else {
         print_str("\nUnknown: ");
         print_str(buf);
@@ -78,7 +91,7 @@ void execute(char* buf) {
 
 void shell_main() {
     clear_screen();
-    print_str("MyKernel Shell - type 'help' for commands\n");
+    print_str("MyKernel Shell v2.0 - type 'help' for commands\n");
     print_str("mysh> ");
 
     char buf[MAX_INPUT];
@@ -92,7 +105,6 @@ void shell_main() {
         uint8_t scancode = inb(0x60);
         if (scancode == last) continue;
         last = scancode;
-
         if (scancode & 0x80) continue;
 
         char key = (scancode < 58) ? scancode_to_ascii[scancode] : 0;
