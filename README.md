@@ -1,20 +1,23 @@
 # MyKernel 🖥️
 
-A bare-metal x86 operating system kernel built from scratch in C and x86 Assembly, running on QEMU. Implements core OS primitives — a Multiboot-compliant bootloader, VGA text rendering, PS/2 keyboard input, a bump memory allocator, and an interactive kernel shell — all without any standard library or operating system support.
+A bare-metal x86 operating system kernel built from scratch in C and x86 Assembly, running on QEMU. Implements core OS primitives — a Multiboot-compliant bootloader, VGA text rendering, PS/2 keyboard input, a bump memory allocator, an interactive kernel shell, and a professional kernel panic handler with CPU register dump — all without any standard library or operating system support.
 
 ---
 
 ## Demo
 
+### Shell
 ```
-MyKernel Shell - type 'help' for commands
+MyKernel Shell v2.0 - type 'help' for commands
 mysh> help
 
 Available commands:
-  help  - show this message
-  clear - clear the screen
-  mem   - show memory info
-  about - about this kernel
+  help      - show this message
+  clear     - clear the screen
+  mem       - show memory info
+  about     - about this kernel
+  panic     - trigger kernel panic (test)
+  divzero   - trigger division by zero
 
 mysh> mem
 
@@ -23,16 +26,37 @@ Heap size:  1MB
 
 mysh> about
 
-MyKernel v1.0 - built from scratch in C + Assembly
+MyKernel v2.0 - built from scratch in C + Assembly
 Author: Baranidharanv06
 
-mysh> _
+mysh> panic
+```
+
+### Kernel Panic Screen
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ██  *** KERNEL PANIC ***  ██    MyKernel v2.0                              ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  Exception : Division by Zero (Exception #0)                                ║
+║  Error Code: 0x00000000                                                     ║
+║  Details   : A program attempted to divide a number by zero.                ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  REGISTERS AT TIME OF CRASH:                                                ║
+║  EAX: 0x00000000        EBX: 0x00000000                                     ║
+║  ECX: 0x00000001        EDX: 0x00000000                                     ║
+║  ESP: 0x00090000        EBP: 0x00090000                                     ║
+║  ESI: 0x00000000        EDI: 0x00000000                                     ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  System halted. Restart QEMU to reboot.                                     ║
+║  github.com/Baranidharanv06/OS-Kernal                                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
 ---
 
 ## Features
 
+### v1.0
 - **Multiboot bootloader** — GRUB-compatible entry point, switches CPU to 32-bit protected mode
 - **VGA text rendering** — direct writes to the 0xb8000 memory-mapped text buffer with color support
 - **PS/2 keyboard driver** — hardware polling via I/O ports 0x60/0x64 with scancode-to-ASCII translation
@@ -41,6 +65,14 @@ mysh> _
 - **Freestanding C kernel** — zero standard library dependencies, compiled with `-ffreestanding -nostdlib`
 - **Cross-compiled on macOS** — full toolchain using `x86_64-elf-gcc` and `x86_64-elf-ld`
 
+### v2.0
+- **Kernel panic handler** — catches CPU exceptions (divide by zero, page fault, general protection fault) instead of crashing silently
+- **CPU register dump** — displays all 8 registers (EAX, EBX, ECX, EDX, ESP, EBP, ESI, EDI) at exact crash time
+- **Per-exception descriptions** — each exception type shows a different human-readable explanation
+- **IDT (Interrupt Descriptor Table)** — 32-bit IDT setup with ISR stubs for exceptions 0, 13, and 14
+- **Box-bordered panic UI** — double-line ASCII box borders, color-coded sections (yellow labels, white values, red messages, cyan headers)
+- **Shell panic commands** — `panic` (manual trigger with `0xDEADBEEF`) and `divzero` (real CPU exception) for live testing
+
 ---
 
 ## Architecture
@@ -48,14 +80,15 @@ mysh> _
 ```
 mykernel/
 ├── src/
-│   ├── boot.asm       # Multiboot header + _start entry point
-│   ├── kernel.c       # kernel_main — calls shell_main()
-│   ├── shell.c        # Interactive shell — input, parsing, commands
-│   ├── memory.c       # Bump allocator — kmalloc(), kfree(), reset_heap()
-│   ├── idt.c          # Interrupt Descriptor Table + PIC remapping
-│   ├── isr.asm        # Assembly interrupt service routine stub
-│   └── linker.ld      # Memory layout: kernel loads at 1MB (0x100000)
-├── build/             # Compiled output (kernel.elf)
+│   ├── boot.asm          # Multiboot header + _start entry point
+│   ├── kernel.c          # kernel_main — initialises exceptions then calls shell
+│   ├── shell.c           # Interactive shell — input, parsing, commands
+│   ├── memory.c          # Bump allocator — kmalloc(), kfree(), reset_heap()
+│   ├── panic.c           # Kernel panic screen — register dump, borders, descriptions
+│   ├── exceptions.c      # IDT setup + gate registration for CPU exceptions
+│   ├── exceptions.asm    # Assembly ISR stubs — save registers, call kernel_panic_full
+│   └── linker.ld         # Memory layout: kernel loads at 1MB (0x100000)
+├── build/                # Compiled output (kernel.elf)
 └── Makefile
 ```
 
@@ -67,7 +100,18 @@ mykernel/
 1. GRUB reads the **Multiboot header** in `boot.asm` (magic number `0x1BADB002`)
 2. CPU is placed into **32-bit protected mode** by GRUB
 3. `_start` sets up the stack pointer and calls `kernel_main()`
-4. `kernel_main()` calls `shell_main()` — the kernel becomes an interactive shell
+4. `kernel_main()` calls `exceptions_init()` then `shell_main()`
+
+### Kernel panic handler (v2.0)
+- `exceptions_init()` sets up the IDT — a 256-entry table mapping each CPU exception number to a handler function
+- When a CPU exception fires (e.g. divide by zero = exception 0), the CPU looks up entry 0 in the IDT and jumps to our ISR stub in `exceptions.asm`
+- The ISR stub saves all registers with `pusha`, then calls `kernel_panic_full()` with the exception name, error code, and register pointer
+- `kernel_panic_full()` draws the full panic screen, dumps all 8 registers, then halts with `cli; hlt`
+
+### Per-exception descriptions
+- Division by Zero → "A program attempted to divide a number by zero"
+- General Protection Fault → "CPU protection violation — illegal instruction or access"
+- Page Fault → "Invalid memory address was accessed (null pointer?)"
 
 ### Keyboard driver
 - Polls the **status register** at port `0x64` — if bit 0 is set, a scancode is waiting
@@ -89,7 +133,7 @@ mykernel/
 
 ### VGA text rendering
 - Text mode buffer at `0xb8000` — 80×25 characters, 2 bytes per cell (char + color attribute)
-- Color byte `0x0A` = green on black, `0x0F` = white on black
+- Color byte `0x0A` = green on black, `0x0F` = white on black, `0x4F` = white on red (panic)
 
 ### Cross-compilation (macOS)
 macOS ships with a Mach-O toolchain that cannot produce ELF binaries for x86. This project uses:
@@ -116,6 +160,13 @@ make all
 
 ```bash
 qemu-system-i386 -kernel build/kernel.elf
+```
+
+### Trigger a kernel panic
+
+```
+mysh> panic      # manual panic with 0xDEADBEEF error code
+mysh> divzero    # real CPU division by zero exception
 ```
 
 ### Clean
@@ -148,6 +199,9 @@ make clean
 - PS/2 keyboard protocol — scan codes, status registers, I/O port reads
 - Implementing `kmalloc`/`kfree` with a bump allocator from scratch
 - Building a command parser and shell loop without any standard library
+- **IDT (Interrupt Descriptor Table)** — mapping CPU exception numbers to handler functions
+- **ISR stubs in Assembly** — saving CPU state with `pusha` before calling C handlers
+- **CPU register dump** — reading register values at crash time via stack pointer
 - Writing freestanding C — no `malloc`, no `printf`, no OS beneath you
 - Cross-compiling for a different architecture and binary format on macOS
 - GNU `make`, linker scripts, and ELF binary structure
@@ -157,10 +211,15 @@ make clean
 
 ## Roadmap
 
+- [x] Multiboot bootloader
+- [x] VGA text rendering
+- [x] PS/2 keyboard driver (polling)
+- [x] Bump memory allocator (kmalloc/kfree)
+- [x] Interactive kernel shell
+- [x] Kernel panic handler with CPU register dump and per-exception descriptions
+- [ ] Cooperative multitasking — multiple tasks sharing the CPU
 - [ ] Interrupt-driven keyboard (replace polling with IDT + IRQ1)
 - [ ] Paging — virtual memory with a page table
-- [ ] `echo` command that uses `kmalloc` to store strings dynamically
-- [ ] Process scheduler — basic round-robin multitasking
 - [ ] Filesystem — simple in-memory FAT-style filesystem
 
 ---
